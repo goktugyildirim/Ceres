@@ -26,19 +26,17 @@ class CustomDataset(Dataset):
             else:
                 path_class = os.path.join(path_class, "test")
 
-
             for idx, file_name in enumerate(os.listdir(path_class)):
                 path_file = os.path.join(path_class, file_name)
                 waveform, sr = torchaudio.load(path_file)
                 metadata = torchaudio.info(path_file)
                 if self.transform:
-                    waveform = self.padding(waveform, self.max_length)
                     transform = torchaudio.transforms.Resample(orig_freq=sr, new_freq=self.sr)
                     waveform = transform(waveform)
+                    waveform = self.padding(waveform, self.max_length)
                     sr = self.sr
 
                 self.samples.append((waveform, idx_class, sr))
-
 
     def __len__(self):
         return len(self.samples)
@@ -56,3 +54,5 @@ class CustomDataset(Dataset):
     def getLabelsMap(self):
         return self.labels_map
 
+    def getLabelCount(self):
+        return len(self.labels_map)
