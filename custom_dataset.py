@@ -2,15 +2,19 @@ import os
 
 from torch.utils.data import Dataset
 import torchaudio
+import torch
 
 
 # This is a custom dataset class.
 class CustomDataset(Dataset):
-    def __init__(self, path_dataset, is_train=True, transform=None):
-        self.samples = []  # Dictionary to hold class names and paths
-        self.labels_map = {}  # Dictionary to hold class names and indices
+    def __init__(self, path_dataset, is_train=True,
+                 transform=False, max_length=32000, sr=4000):
+        self.samples = []
+        self.labels_map = {}
         self.is_train = is_train
         self.transform = transform
+        self.max_length = max_length
+        self.sr = sr
         self.read(path_dataset)
 
     def read(self, path_dataset):
@@ -22,40 +26,33 @@ class CustomDataset(Dataset):
             else:
                 path_class = os.path.join(path_class, "test")
 
+
             for idx, file_name in enumerate(os.listdir(path_class)):
                 path_file = os.path.join(path_class, file_name)
                 waveform, sr = torchaudio.load(path_file)
-                self.samples.append((waveform, idx_class, sr))
+                metadata = torchaudio.info(path_file)
+                if self.transform:
+                    waveform = self.padding(waveform, self.max_length)
+                    transform = torchaudio.transforms.Resample(orig_freq=sr, new_freq=self.sr)
+                    waveform = transform(waveform)
+                    sr = self.sr
 
+                self.samples.append((waveform, idx_class, sr))
 
 
     def __len__(self):
         return len(self.samples)
 
     def __getitem__(self, index):
-        return self.samples[index][0], self.samples[index][1]
+        return self.samples[index][0], self.samples[index][1], self.samples[index][2]
 
+    def padding(self, waveform, max_len):
+        # Pad the waveform
+        length_waveform = waveform.shape[1]
+        if length_waveform < max_len:
+            waveform = torch.cat((waveform, torch.zeros((1, max_len - length_waveform))), dim=1)
+        return waveform
 
+    def getLabelsMap(self):
+        return self.labels_map
 
-
-
-
-
-# class CustomDataset(Dataset):
-#     def __init__(self, csv_path, audio_dir, transform=None):
-#         self.df = pd.read_csv(csv_path)
-#         self.audio_dir = audio_dir
-#         self.transform = transform
-#
-#     def __len__(self):
-#         return len(self.df)
-#
-#     def __getitem__(self, idx):
-#         wav_path = os.path.join(self.audio_dir, self.df.iloc[idx, 0])
-#         label = self.df.iloc[idx, 1]
-#         # Load audio
-#         audio, sample_rate = torchaudio.load(wav_path)
-#         # Apply transforms
-#         if self.transform:
-#             audio = self.transform(audio)
-#         return audio, label
